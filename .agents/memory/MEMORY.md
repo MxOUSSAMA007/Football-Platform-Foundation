@@ -1,0 +1,1 @@
+- [Prisma migration baseline](prisma-baseline.md) — initial schema was baselined non-destructively after the development database was already synchronized.

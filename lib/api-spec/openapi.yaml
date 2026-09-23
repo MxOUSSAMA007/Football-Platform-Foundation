@@ -10,6 +10,10 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: matches
+    description: Unified football match data
+  - name: operations
+    description: Provider and platform observability
 paths:
   /healthz:
     get:
@@ -24,6 +28,61 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /matches:
+    get:
+      operationId: listMatches
+      tags: [matches]
+      summary: List matches for a date
+      description: Returns normalized matches through the internal data integration layer.
+      parameters:
+        - name: date
+          in: query
+          required: true
+          description: Calendar date in ISO 8601 format.
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Normalized matches for the requested date.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchesResponse"
+        "400":
+          description: Invalid date.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /operations/provider-health:
+    get:
+      operationId: listProviderHealth
+      tags: [operations]
+      summary: List provider health
+      description: Returns the current health snapshot for configured data providers.
+      responses:
+        "200":
+          description: Provider health snapshot.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderHealth"
+  /operations/summary:
+    get:
+      operationId: getOperationsSummary
+      tags: [operations]
+      summary: Get platform operations summary
+      description: Returns a lightweight operational summary for the Phase 1 shell.
+      responses:
+        "200":
+          description: Platform operations summary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationsSummary"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +92,158 @@ components:
           type: string
       required:
         - status
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+    TeamSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        shortName:
+          type: ["string", "null"]
+        countryName:
+          type: ["string", "null"]
+        logoUrl:
+          type: ["string", "null"]
+      required: [id, name, shortName, countryName, logoUrl]
+    Score:
+      type: object
+      properties:
+        home:
+          type: ["integer", "null"]
+        away:
+          type: ["integer", "null"]
+      required: [home, away]
+    Match:
+      type: object
+      properties:
+        id:
+          type: integer
+        kickoff:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [UPCOMING, LIVE, HALFTIME, FULL_TIME, POSTPONED, CANCELLED
+          ]
+        minute:
+          type: ["integer", "null"]
+        leagueName:
+          type: string
+        leagueCountry:
+          type: ["string", "null"]
+        round:
+          type: ["string", "null"]
+        homeTeam:
+          $ref: "#/components/schemas/TeamSummary"
+        awayTeam:
+          $ref: "#/components/schemas/TeamSummary"
+        score:
+          $ref: "#/components/schemas/Score"
+        dataSource:
+          type: string
+          enum: [REAL, MOCK]
+        sourceLabel:
+          type: string
+      required:
+        - id
+        - kickoff
+        - status
+        - minute
+        - leagueName
+        - leagueCountry
+        - round
+        - homeTeam
+        - awayTeam
+        - score
+        - dataSource
+        - sourceLabel
+    MatchesResponse:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        dataMode:
+          type: string
+          enum: [REAL, MOCK, UNAVAILABLE]
+        providerMessage:
+          type: ["string", "null"]
+        matches:
+          type: array
+          items:
+            $ref: "#/components/schemas/Match"
+        fetchedAt:
+          type: string
+          format: date-time
+      required: [date, dataMode, providerMessage, matches, fetchedAt]
+    ProviderHealth:
+      type: object
+      properties:
+        provider:
+          type: string
+        displayName:
+          type: string
+        status:
+          type: string
+          enum: [ONLINE, DEGRADED, RATE_LIMITED, OFFLINE, DISABLED]
+        enabled:
+          type: boolean
+        lastSuccessfulRequest:
+          type: ["string", "null"]
+          format: date-time
+        lastFailedRequest:
+          type: ["string", "null"]
+          format: date-time
+        lastError:
+          type: ["string", "null"]
+        responseTimeMs:
+          type: ["integer", "null"]
+        rateLimited:
+          type: boolean
+        failureCount:
+          type: integer
+      required:
+        - provider
+        - displayName
+        - status
+        - enabled
+        - lastSuccessfulRequest
+        - lastFailedRequest
+        - lastError
+        - responseTimeMs
+        - rateLimited
+        - failureCount
+    OperationsSummary:
+      type: object
+      properties:
+        generatedAt:
+          type: string
+          format: date-time
+        providerCount:
+          type: integer
+        onlineProviderCount:
+          type: integer
+        cacheEnabled:
+          type: boolean
+        architectureVersion:
+          type: string
+        notices:
+          type: array
+          items:
+            type: string
+      required:
+        - generatedAt
+        - providerCount
+        - onlineProviderCount
+        - cacheEnabled
+        - architectureVersion
+        - notices
 

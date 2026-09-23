@@ -1,6 +1,6 @@
-# [Project name]
+# Football Platform
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A multilingual football live-score platform foundation with a unified internal API, normalized provider data, and a responsive Matches shell.
 
 ## Run & Operate
 
@@ -8,37 +8,48 @@ _Replace the heading above with the project's name, and this line with one sente
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- `pnpm --filter @workspace/db run generate` — generate Prisma client
+- `pnpm --filter @workspace/db run push` — sync the development schema
+- `pnpm --filter @workspace/db run migrate -- --name <name>` — create/apply a named Prisma migration
 - Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
 - API: Express 5
-- DB: PostgreSQL + Drizzle ORM
+- DB: PostgreSQL + Prisma ORM
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
 - Build: esbuild (CJS bundle)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/football-platform` — responsive user-facing React app
+- `artifacts/api-server/src/lib/football` — provider contracts, cache, health, normalization, and orchestration
+- `lib/api-spec/openapi.yaml` — API contract source of truth
+- `lib/db/prisma/schema.prisma` — normalized PostgreSQL schema
+- `docs/` — architecture and extension documentation
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Internal numeric IDs are always separate from provider IDs; `ExternalEntityMapping` bridges them.
+- Provider priority is capability-specific and centralized, so adding a provider does not change UI or route code.
+- The cache and request coalescing layers are interface-based; Phase 1 uses memory cache and can move to Redis.
+- Development fixture data is explicit `MOCK` data and is disabled in production.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+The Phase 1 shell provides date-based Matches, a clear data-source mode, loading/empty/error states, responsive navigation, English/French/Arabic labels with RTL support, light/dark themes, and an operations view for provider health.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+The attached Phase 1 brief requires stopping after the foundation; do not implement Phase 2 features automatically.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Re-run API codegen after changing `lib/api-spec/openapi.yaml`.
+- `artifact.toml` is managed by the artifact workflow; do not edit it directly.
+- A Prisma migration was baselined after the initial development schema sync; do not reset the database to recreate it.
 
 ## Pointers
 

@@ -1,0 +1,396 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EntityType {
+  COUNTRY
+  LEAGUE
+  SEASON
+  TEAM
+  PLAYER
+  MATCH
+}
+
+enum MatchStatus {
+  UPCOMING
+  LIVE
+  HALFTIME
+  FULL_TIME
+  POSTPONED
+  CANCELLED
+}
+
+enum DataSource {
+  REAL
+  MOCK
+}
+
+enum ProviderStatus {
+  ONLINE
+  DEGRADED
+  RATE_LIMITED
+  OFFLINE
+  DISABLED
+}
+
+model User {
+  id              Int               @id @default(autoincrement())
+  externalSubject String?           @unique
+  email           String?           @unique
+  displayName     String?
+  locale          String             @default("en")
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  favoriteTeams   FavoriteTeam[]
+  favoritePlayers FavoritePlayer[]
+  favoriteLeagues FavoriteLeague[]
+  notifications   Notification[]
+}
+
+model Country {
+  id             Int                    @id @default(autoincrement())
+  name           String
+  normalizedName String                 @unique
+  code           String?
+  teams          Team[]
+  leagues        League[]
+  mappings       ExternalEntityMapping[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+}
+
+model League {
+  id             Int                    @id @default(autoincrement())
+  name           String
+  normalizedName String
+  countryId      Int?
+  country        Country?               @relation(fields: [countryId], references: [id])
+  seasons        Season[]
+  matches        Match[]
+  standings      Standing[]
+  favorites      FavoriteLeague[]
+  mappings       ExternalEntityMapping[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@unique([normalizedName, countryId])
+  @@index([countryId])
+}
+
+model Season {
+  id             Int                    @id @default(autoincrement())
+  name           String
+  normalizedName String
+  startDate      DateTime?
+  endDate        DateTime?
+  leagueId       Int
+  league         League                 @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  matches        Match[]
+  mappings       ExternalEntityMapping[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@unique([leagueId, normalizedName])
+  @@index([leagueId])
+}
+
+model Team {
+  id             Int                    @id @default(autoincrement())
+  name           String
+  shortName      String?
+  normalizedName String
+  aliases        String[]
+  countryId      Int?
+  country        Country?               @relation(fields: [countryId], references: [id])
+  homeMatches    Match[]                @relation("homeTeam")
+  awayMatches    Match[]                @relation("awayTeam")
+  players        Player[]
+  lineups        LineupPlayer[]
+  standings      Standing[]
+  favorites      FavoriteTeam[]
+  mappings       ExternalEntityMapping[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([normalizedName])
+  @@index([countryId])
+}
+
+model Player {
+  id             Int                    @id @default(autoincrement())
+  name           String
+  normalizedName String
+  position       String?
+  jerseyNumber   Int?
+  teamId         Int?
+  team           Team?                  @relation(fields: [teamId], references: [id])
+  lineups        LineupPlayer[]
+  statistics     PlayerStatistic[]
+  favoriteBy     FavoritePlayer[]
+  mappings       ExternalEntityMapping[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([normalizedName])
+  @@index([teamId])
+}
+
+model Match {
+  id             Int                    @id @default(autoincrement())
+  kickoff        DateTime
+  status         MatchStatus
+  minute         Int?
+  leagueId       Int
+  league         League                 @relation(fields: [leagueId], references: [id])
+  seasonId       Int?
+  season         Season?                @relation(fields: [seasonId], references: [id])
+  round          String?
+  homeTeamId     Int
+  homeTeam       Team                   @relation("homeTeam", fields: [homeTeamId], references: [id])
+  awayTeamId     Int
+  awayTeam       Team                   @relation("awayTeam", fields: [awayTeamId], references: [id])
+  homeScore      Int?
+  awayScore      Int?
+  dataSource     DataSource              @default(REAL)
+  sourceLabel    String
+  events         MatchEvent[]
+  lineups        Lineup[]
+  statistics     MatchStatistic[]
+  mappings       ExternalEntityMapping[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([kickoff])
+  @@index([leagueId, kickoff])
+  @@index([seasonId])
+  @@index([homeTeamId])
+  @@index([awayTeamId])
+  @@index([status, kickoff])
+}
+
+model MatchEvent {
+  id          Int      @id @default(autoincrement())
+  matchId     Int
+  match       Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  minute      Int?
+  extraMinute Int?
+  type        String
+  detail      String?
+  teamId      Int?
+  playerId    Int?
+  createdAt   DateTime @default(now())
+
+  @@index([matchId, minute])
+}
+
+model Lineup {
+  id          Int            @id @default(autoincrement())
+  matchId     Int
+  match       Match          @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  teamId      Int
+  formation   String?
+  coachName   String?
+  players     LineupPlayer[]
+  createdAt   DateTime       @default(now())
+
+  @@unique([matchId, teamId])
+  @@index([teamId])
+}
+
+model LineupPlayer {
+  id         Int      @id @default(autoincrement())
+  lineupId   Int
+  lineup     Lineup   @relation(fields: [lineupId], references: [id], onDelete: Cascade)
+  playerId   Int
+  player     Player   @relation(fields: [playerId], references: [id])
+  teamId     Int
+  team       Team     @relation(fields: [teamId], references: [id])
+  position   String?
+  starter    Boolean  @default(false)
+  substitute Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([lineupId, playerId])
+  @@index([playerId])
+  @@index([teamId])
+}
+
+model Standing {
+  id        Int      @id @default(autoincrement())
+  leagueId  Int
+  league    League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  seasonId  Int?
+  teamId    Int
+  team      Team     @relation(fields: [teamId], references: [id])
+  position  Int
+  played    Int      @default(0)
+  won       Int      @default(0)
+  drawn     Int      @default(0)
+  lost      Int      @default(0)
+  goalsFor  Int      @default(0)
+  goalsAgainst Int   @default(0)
+  points    Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@unique([leagueId, seasonId, teamId])
+  @@index([leagueId, position])
+}
+
+model MatchStatistic {
+  id        Int      @id @default(autoincrement())
+  matchId   Int
+  match     Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  teamId    Int?
+  category  String
+  homeValue String?
+  awayValue String?
+  createdAt DateTime @default(now())
+
+  @@unique([matchId, category, teamId])
+  @@index([matchId])
+}
+
+model PlayerStatistic {
+  id          Int      @id @default(autoincrement())
+  playerId    Int
+  player      Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  seasonId    Int?
+  appearances Int      @default(0)
+  goals       Int      @default(0)
+  assists     Int      @default(0)
+  minutes     Int      @default(0)
+  rating      Float?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([playerId, seasonId])
+  @@index([playerId])
+}
+
+model NewsSource {
+  id          Int           @id @default(autoincrement())
+  name        String
+  url         String?
+  provider    String
+  articles    NewsArticle[]
+  createdAt   DateTime      @default(now())
+}
+
+model NewsArticle {
+  id            Int        @id @default(autoincrement())
+  title         String
+  summary       String?
+  url           String     @unique
+  imageUrl      String?
+  publishedAt   DateTime
+  sourceId      Int
+  source        NewsSource @relation(fields: [sourceId], references: [id])
+  createdAt     DateTime   @default(now())
+
+  @@index([publishedAt])
+  @@index([sourceId])
+}
+
+model FavoriteTeam {
+  userId    Int
+  teamId    Int
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team      Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, teamId])
+}
+
+model FavoritePlayer {
+  userId    Int
+  playerId  Int
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  player    Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, playerId])
+}
+
+model FavoriteLeague {
+  userId    Int
+  leagueId  Int
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  league    League @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, leagueId])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, readAt])
+}
+
+model ExternalEntityMapping {
+  id           Int        @id @default(autoincrement())
+  provider     String
+  externalId   String
+  entityType   EntityType
+  internalId   Int
+  normalizedKey String?
+  confidence   Float?
+  needsReview  Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  country      Country?   @relation(fields: [countryId], references: [id])
+  countryId    Int?
+  league       League?    @relation(fields: [leagueId], references: [id])
+  leagueId     Int?
+  season       Season?    @relation(fields: [seasonId], references: [id])
+  seasonId     Int?
+  team         Team?      @relation(fields: [teamId], references: [id])
+  teamId       Int?
+  player       Player?    @relation(fields: [playerId], references: [id])
+  playerId     Int?
+  match        Match?     @relation(fields: [matchId], references: [id])
+  matchId      Int?
+
+  @@unique([provider, externalId, entityType])
+  @@index([entityType, internalId])
+  @@index([normalizedKey])
+}
+
+model ProviderConfig {
+  id             Int            @id @default(autoincrement())
+  provider       String
+  displayName    String
+  capability     String
+  priority       Int
+  enabled        Boolean        @default(false)
+  status         ProviderStatus @default(DISABLED)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([provider, capability])
+  @@index([capability, priority])
+}
+
+model ProviderHealthSnapshot {
+  id                      Int            @id @default(autoincrement())
+  provider                String         @unique
+  status                  ProviderStatus @default(DISABLED)
+  lastSuccessfulRequest   DateTime?
+  lastFailedRequest       DateTime?
+  lastError               String?
+  responseTimeMs          Int?
+  rateLimited             Boolean        @default(false)
+  failureCount            Int            @default(0)
+  updatedAt               DateTime       @updatedAt
+}

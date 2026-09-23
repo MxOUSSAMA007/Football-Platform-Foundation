@@ -1,0 +1,698 @@
+# FOOTBALL APP — PHASE 1
+
+## Architecture, Database, Multi-API Integration System and Foundation
+
+Build the foundation of a production-ready football live-score platform.
+
+The application will eventually support multiple football APIs, news APIs, RSS feeds and statistics providers.
+
+IMPORTANT:
+
+Do NOT build the entire application at once.
+
+This phase is ONLY for building the correct architecture and foundation so that all future APIs and features can be added without rewriting the application.
+
+The application must use an original design and must not copy proprietary branding, assets or exact UI layouts from FotMob, SofaScore or Flashscore.
+
+---
+
+# 1. TECHNOLOGY STACK
+
+Use:
+
+* Next.js
+* TypeScript
+* React
+* Tailwind CSS
+* PostgreSQL
+* Prisma ORM
+* REST API architecture
+* Redis or an equivalent cache if available
+* Secure environment variables
+* Responsive mobile-first UI
+
+Use clean modular architecture.
+
+---
+
+# 2. CORE ARCHITECTURE
+
+The architecture must be:
+
+Frontend
+↓
+Our Backend API
+↓
+Data Integration Layer
+↓
+Provider Adapters
+↓
+External APIs
+↓
+Database + Cache
+
+The frontend MUST NOT directly call external football APIs.
+
+All external API communication must happen through our backend.
+
+The frontend must only consume our own unified API.
+
+---
+
+# 3. MULTI-PROVIDER ARCHITECTURE
+
+Create a provider abstraction system.
+
+The application must NEVER depend directly on one API provider.
+
+Create a structure similar to:
+
+```text
+/providers
+    /football
+        /thesportsdb
+        /football-data
+        /openligadb
+        /api-football
+    /news
+        /gnews
+        /newsdata
+        /rss
+    /video
+        /scorebat
+```
+
+Not every provider needs to be activated immediately.
+
+Create the architecture so providers can be enabled later.
+
+---
+
+# 4. PROVIDER INTERFACE
+
+Create standardized interfaces.
+
+For example:
+
+```typescript
+interface FootballDataProvider {
+  getMatches(date: string): Promise<Match[]>;
+  getMatchDetails(matchId: string): Promise<MatchDetails | null>;
+  getLineups(matchId: string): Promise<Lineup[]>;
+  getStandings(leagueId: string, season?: string): Promise<Standing[]>;
+  getTeams(leagueId: string): Promise<Team[]>;
+  getPlayers(teamId: string): Promise<Player[]>;
+  getPlayerStats(playerId: string): Promise<PlayerStats | null>;
+}
+```
+
+The exact interface can be extended when required.
+
+The important requirement is:
+
+The rest of the application must communicate with standardized internal interfaces, NOT directly with provider-specific APIs.
+
+---
+
+# 5. INTERNAL DATA MODEL
+
+Create normalized database models for:
+
+* User
+* Team
+* Player
+* League
+* Country
+* Season
+* Match
+* MatchEvent
+* Lineup
+* LineupPlayer
+* Standing
+* MatchStatistic
+* PlayerStatistic
+* NewsArticle
+* NewsSource
+* FavoriteTeam
+* FavoritePlayer
+* FavoriteLeague
+* Notification
+
+Use Prisma migrations.
+
+Create proper relationships and indexes.
+
+---
+
+# 6. INTERNAL IDs VS EXTERNAL IDs
+
+This is a CRITICAL requirement.
+
+Every entity must have an internal database ID.
+
+Never use an external API ID as our primary internal ID.
+
+Example:
+
+```text
+Internal Team ID:
+15
+
+TheSportsDB:
+86
+
+Football Provider B:
+12345
+
+Provider C:
+998
+```
+
+Create provider mapping records.
+
+Example concept:
+
+```text
+ExternalEntityMapping
+
+internalEntityId
+provider
+externalId
+entityType
+```
+
+The same concept must work for:
+
+* Teams
+* Players
+* Leagues
+* Matches
+* Countries
+* Seasons
+
+Never assume that two providers use the same IDs.
+
+---
+
+# 7. ENTITY NORMALIZATION
+
+Different providers may return:
+
+```text
+Real Madrid
+Real Madrid CF
+Real Madrid Club de Fútbol
+```
+
+These must be resolved to the same internal Team.
+
+Use:
+
+* Provider external IDs
+* Internal IDs
+* Normalized names
+* Aliases
+* Country
+* League
+* Season
+* Other identifiers when available
+
+Do NOT rely only on fuzzy name matching.
+
+If automatic matching is uncertain, flag it instead of creating duplicate entities.
+
+---
+
+# 8. DATA SOURCE PRIORITY
+
+Create a configurable provider priority system.
+
+Example:
+
+```text
+Matches:
+
+Primary Provider
+↓
+Secondary Provider
+↓
+Fallback Provider
+↓
+Cache
+```
+
+Do not hard-code the priority throughout the application.
+
+Create a central configuration/service where provider priorities can be changed.
+
+Example:
+
+```text
+MATCHES:
+1. Provider A
+2. Provider B
+3. Provider C
+
+LINEUPS:
+1. Provider B
+2. Provider A
+
+NEWS:
+1. GNews
+2. NewsData
+3. RSS
+```
+
+These are examples only and must remain configurable.
+
+---
+
+# 9. API FAILURE HANDLING
+
+If one provider fails:
+
+DO NOT crash the application.
+
+Handle:
+
+* Timeout
+* HTTP errors
+* Rate limits
+* Invalid responses
+* Empty responses
+* Authentication errors
+* Temporary provider downtime
+
+Use fallback providers when available.
+
+Use cached data when appropriate.
+
+---
+
+# 10. RATE LIMIT PROTECTION
+
+Implement:
+
+* Request caching
+* Request deduplication
+* Retry logic
+* Exponential backoff
+* Timeouts
+* Rate-limit detection
+* Provider health tracking
+
+Example:
+
+100 users request the same match.
+
+Do NOT send 100 requests to the external provider.
+
+Instead:
+
+```text
+1 external request
+↓
+cache
+↓
+100 users receive the shared result
+```
+
+---
+
+# 11. CACHE ARCHITECTURE
+
+Create a cache abstraction.
+
+Do not tightly couple business logic to Redis.
+
+Example:
+
+```typescript
+interface CacheService {
+  get<T>(key: string): Promise<T | null>;
+  set<T>(key: string, value: T, ttl: number): Promise<void>;
+  delete(key: string): Promise<void>;
+}
+```
+
+This allows Redis or another cache provider to be changed later.
+
+---
+
+# 12. ENVIRONMENT VARIABLES
+
+Create `.env.example`.
+
+Never expose API keys to the frontend.
+
+Example:
+
+```env
+DATABASE_URL=
+REDIS_URL=
+
+THESPORTSDB_API_KEY=
+FOOTBALL_DATA_API_KEY=
+API_FOOTBALL_KEY=
+
+GNEWS_API_KEY=
+NEWSDATA_API_KEY=
+```
+
+Only include variables for providers that are actually implemented.
+
+Never commit real secrets.
+
+---
+
+# 13. PROVIDER HEALTH MONITORING
+
+Create a provider health service.
+
+Track:
+
+* Provider name
+* Status
+* Last successful request
+* Last failed request
+* Last error
+* Response time
+* Rate-limit status
+* Number of failures
+
+Possible statuses:
+
+```text
+ONLINE
+DEGRADED
+RATE_LIMITED
+OFFLINE
+DISABLED
+```
+
+---
+
+# 14. DATABASE INDEXING
+
+Create appropriate indexes for:
+
+* Match date
+* League
+* Season
+* Home team
+* Away team
+* Player
+* Team
+* External IDs
+* Provider mappings
+* News publication date
+
+Avoid unnecessary indexes.
+
+---
+
+# 15. INITIAL UI
+
+Create ONLY the basic application shell in this phase.
+
+Bottom navigation:
+
+1. Matches
+2. News
+3. Leagues
+4. Following
+5. More
+
+Create:
+
+* Responsive layout
+* Mobile-first design
+* Dark/light mode foundation
+* Arabic RTL support
+* French support
+* English support
+* Loading states
+* Empty states
+* Error states
+
+Do not implement all advanced screens yet.
+
+---
+
+# 16. MATCHES FOUNDATION
+
+Create the initial Matches page architecture.
+
+It should support:
+
+* Yesterday
+* Today
+* Tomorrow
+* Date selection
+
+Create the match-card component.
+
+The card should eventually support:
+
+* Teams
+* Logos
+* Kickoff
+* Score
+* Status
+* Live minute
+* Important events
+
+For now, use mock data ONLY if necessary for UI testing.
+
+Clearly label mock data in development.
+
+Do not present mock data as real football data.
+
+---
+
+# 17. INTERNATIONALIZATION
+
+Create:
+
+```text
+/locales
+    ar.json
+    fr.json
+    en.json
+```
+
+Do not hard-code UI strings inside components.
+
+Arabic must support proper RTL layout.
+
+The architecture must allow adding more languages later.
+
+---
+
+# 18. CODE ORGANIZATION
+
+Use a clean structure similar to:
+
+```text
+/app
+/components
+/providers
+/services
+/repositories
+/lib
+/database
+/types
+/hooks
+/utils
+/locales
+/config
+/admin
+```
+
+Separate:
+
+* UI
+* Business logic
+* Provider integrations
+* Database access
+* Cache
+* Configuration
+* Types
+
+Do not put everything inside React components.
+
+---
+
+# 19. REPOSITORY / SERVICE SEPARATION
+
+External API calls should NOT be written directly inside UI components.
+
+Use:
+
+```text
+UI
+↓
+Application Service
+↓
+Repository / Data Service
+↓
+Provider Adapter
+↓
+External API
+```
+
+This is mandatory.
+
+---
+
+# 20. REAL DATA VS MOCK DATA
+
+The system must clearly distinguish:
+
+REAL DATA
+MOCK DATA
+
+Never silently replace real API data with fake data.
+
+If an API is not configured:
+
+Show an appropriate development state such as:
+
+"Football data provider is not configured."
+
+---
+
+# 21. TESTING
+
+Create basic tests for:
+
+* Provider interfaces
+* Data normalization
+* External ID mapping
+* Duplicate entity prevention
+* Provider fallback
+* Cache behavior
+* Error handling
+
+Especially test this scenario:
+
+Provider A and Provider B return the same Real Madrid team with different IDs.
+
+The system must resolve them to ONE internal Team.
+
+---
+
+# 22. DOCUMENTATION
+
+Create a README explaining:
+
+* Project architecture
+* Database structure
+* Provider architecture
+* How to add a new provider
+* How external IDs are mapped
+* How caching works
+* How fallback providers work
+* Environment variables
+* How to run the project
+* How to run migrations
+* How to run tests
+
+Also create:
+
+```text
+/docs
+    architecture.md
+    providers.md
+    database.md
+    api-integration.md
+```
+
+---
+
+# 23. IMPORTANT DEVELOPMENT RULE
+
+Before implementing the code:
+
+1. Analyze the requirements.
+2. Propose the final project structure.
+3. Propose the Prisma database schema.
+4. Explain the provider architecture.
+5. Explain the data flow.
+6. Identify any architectural conflicts.
+7. Then start implementation.
+
+Do NOT skip directly to a large amount of UI code.
+
+---
+
+# 24. DO NOT DO THESE THINGS
+
+Do NOT:
+
+* Build a static fake football application.
+* Hard-code football data into components.
+* Call external APIs directly from the frontend.
+* Use external API IDs as internal primary IDs.
+* Assume all providers use the same IDs.
+* Duplicate teams because names differ.
+* Invent unavailable statistics.
+* Invent xG.
+* Make fake lineups appear as real data.
+* Put API keys in frontend code.
+* Hard-code one API provider throughout the application.
+* Create unnecessary dependencies.
+* Build every feature before the foundation is tested.
+
+---
+
+# 25. PHASE 1 SUCCESS CRITERIA
+
+Phase 1 is complete only when:
+
+✓ Application runs successfully.
+
+✓ PostgreSQL connection works.
+
+✓ Prisma schema and migrations work.
+
+✓ Provider abstraction exists.
+
+✓ External ID mapping exists.
+
+✓ Entity normalization exists.
+
+✓ Cache abstraction exists.
+
+✓ Provider fallback architecture exists.
+
+✓ Provider health monitoring foundation exists.
+
+✓ API keys are securely handled.
+
+✓ Frontend consumes our internal API structure.
+
+✓ Basic Matches screen exists.
+
+✓ Arabic/French/English foundation exists.
+
+✓ Dark/light theme foundation exists.
+
+✓ Basic tests pass.
+
+✓ Documentation exists.
+
+Do NOT move to advanced features until these foundations are working.
+
+After completing Phase 1, STOP and show me:
+
+1. Project structure
+2. Database schema
+3. Provider architecture
+4. API routes
+5. Environment variables required
+6. Tests created
+7. What is implemented
+8. What remains for Phase 2
+
+Do not automatically continue to Phase 2.

@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Football Platform"
+description = "A multilingual live football platform foundation with a unified backend API, provider adapters, normalized data, and a responsive Matches experience for fans."
+version = "1.0.0"
+id = "artifacts/football-platform"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25472
+
+[services.development]
+run = "pnpm --filter @workspace/football-platform run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/football-platform", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/football-platform/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25472"
+BASE_PATH = "/"
